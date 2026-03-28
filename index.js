@@ -47,6 +47,16 @@ app.post('/api/sandbox_connect', async (req, res) => {
       public_token: tokenResponse.data.public_token,
     });
     ACCESS_TOKEN = exchangeResponse.data.access_token;
+
+    try {
+      await plaidClient.sandboxItemFireWebhook({
+        access_token: ACCESS_TOKEN,
+        webhook_code: 'DEFAULT_UPDATE',
+      });
+    } catch (e) {
+      console.log('Webhook fire skipped:', e.message);
+    }
+
     res.json({ success: true, message: 'Sandbox bank connected!' });
   } catch (error) {
     console.error('Sandbox connect error:', error.response?.data || error.message);
@@ -73,19 +83,30 @@ app.get('/api/transactions', async (req, res) => {
       return res.status(400).json({ error: 'No bank connected yet' });
     }
     const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const startDate = thirtyDaysAgo.toISOString().split('T')[0];
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const startDate = ninetyDaysAgo.toISOString().split('T')[0];
     const endDate = now.toISOString().split('T')[0];
 
-    const response = await plaidClient.transactionsGet({
-      access_token: ACCESS_TOKEN,
-      start_date: startDate,
-      end_date: endDate,
-    });
-    res.json(response.data);
+    let allTransactions = [];
+    let hasMore = true;
+    let offset = 0;
+
+    while (hasMore) {
+      const response = await plaidClient.transactionsGet({
+        access_token: ACCESS_TOKEN,
+        start_date: startDate,
+        end_date: endDate,
+        options: { count: 100, offset: offset },
+      });
+      allTransactions = allTransactions.concat(response.data.transactions);
+      hasMore = allTransactions.length < response.data.total_transactions;
+      offset = allTransactions.length;
+    }
+
+    res.json({ transactions: allTransactions, total: allTransactions.length });
   } catch (error) {
     console.error('Transactions error:', error.response?.data || error.message);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.response?.data?.error_message || error.message });
   }
 });
 
@@ -112,3 +133,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Stackd backend running on port ${PORT}`);
 });
+
