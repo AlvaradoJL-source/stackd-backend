@@ -37,6 +37,23 @@ app.post('/api/create_link_token', async (req, res) => {
   }
 });
 
+app.post('/api/sandbox_connect', async (req, res) => {
+  try {
+    const tokenResponse = await plaidClient.sandboxPublicTokenCreate({
+      institution_id: 'ins_109508',
+      initial_products: ['transactions'],
+    });
+    const exchangeResponse = await plaidClient.itemPublicTokenExchange({
+      public_token: tokenResponse.data.public_token,
+    });
+    ACCESS_TOKEN = exchangeResponse.data.access_token;
+    res.json({ success: true, message: 'Sandbox bank connected!' });
+  } catch (error) {
+    console.error('Sandbox connect error:', error.response?.data || error.message);
+    res.status(500).json({ error: error.response?.data || error.message });
+  }
+});
+
 app.post('/api/exchange_public_token', async (req, res) => {
   try {
     const response = await plaidClient.itemPublicTokenExchange({
