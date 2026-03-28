@@ -1,0 +1,27 @@
+{
+  "name": "stackd-backend",
+  "version": "1.0.0",
+  "description": "Plaid backend for Stackd finance app",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlvaradoJL-source/stackd-backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/AlvaradoJL-source/stackd-backend/issues"
+  },
+  "homepage": "https://github.com/AlvaradoJL-source/stackd-backend#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "plaid": "^41.4.0"
+  }
+}
