@@ -1,6 +1,6 @@
-const fetch = require('node-fetch');
 const express = require('express');
 const cors = require('cors');
+const https = require('https');
 const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
 require('dotenv').config();
 
@@ -11,8 +11,27 @@ app.use(express.json());
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
+const httpsRequest = (url, options, body) => {
+  return new Promise((resolve, reject) => {
+    const req = https.request(url, options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, data: JSON.parse(data) });
+        } catch (e) {
+          resolve({ ok: false, status: res.statusCode, data: data });
+        }
+      });
+    });
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+};
+
 const supabaseInsert = async (table, rows) => {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+  const result = await httpsRequest(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -20,13 +39,22 @@ const supabaseInsert = async (table, rows) => {
       'Authorization': `Bearer ${SUPABASE_KEY}`,
       'Prefer': 'return=representation',
     },
-    body: JSON.stringify(rows),
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(JSON.stringify(data));
+  }, JSON.stringify(rows));
+  if (!result.ok) {
+    throw new Error(JSON.stringify(result.data));
   }
-  return data;
+  return result.data;
+};
+
+const supabaseSelect = async (table, limit) => {
+  const result = await httpsRequest(`${SUPABASE_URL}/rest/v1/${table}?limit=${limit}`, {
+    method: 'GET',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+    },
+  });
+  return result;
 };
 
 const configuration = new Configuration({
@@ -127,14 +155,8 @@ app.post('/api/connect_and_sync', async (req, res) => {
 
 app.get('/api/debug', async (req, res) => {
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/transactions?limit=1`, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-      },
-    });
-    const data = await response.json();
-    res.json({ supabase_ok: response.ok, status: response.status, rows: data.length });
+    const result = await supabaseSelect('transactions', 1);
+    res.json({ supabase_ok: result.ok, status: result.status, rows: Array.isArray(result.data) ? result.data.length : 0 });
   } catch (e) {
     res.json({ error: e.message });
   }
