@@ -122,6 +122,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Stackd backend running on port ${PORT}`);
 });
-```
-
-**Make sure nothing extra below the last `});`!** Save, then push:
