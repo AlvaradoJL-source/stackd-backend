@@ -147,16 +147,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Stackd backend running on port ${PORT}`);
 });
-```
-
-**Make sure nothing is below the last `});`!** Save, then push:
-```
-cd C:\Users\alvar\stackd-backend
-git add .
-git commit -m "Use direct Supabase REST API"
-git push
-```
-
-Wait for ACTIVE, then first test the debug endpoint in your browser:
-```
-https://stackd-backend-production.up.railway.app/api/debug
