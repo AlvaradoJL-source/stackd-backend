@@ -1,17 +1,32 @@
 const express = require('express');
 const cors = require('cors');
 const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
-const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+
+const supabaseInsert = async (table, rows) => {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(rows),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(JSON.stringify(data));
+  }
+  return data;
+};
 
 const configuration = new Configuration({
   basePath: PlaidEnvironments[process.env.PLAID_ENV || 'sandbox'],
@@ -90,7 +105,7 @@ app.post('/api/connect_and_sync', async (req, res) => {
     }
 
     if (allTransactions.length === 0) {
-      return res.json({ success: true, imported: 0, message: 'Connected but transactions not ready yet. Try again in 30 seconds.' });
+      return res.json({ success: true, imported: 0, message: 'Connected but transactions not ready yet. Try again.' });
     }
 
     const rows = allTransactions.map(t => ({
@@ -101,13 +116,8 @@ app.post('/api/connect_and_sync', async (req, res) => {
       date: t.date,
     }));
 
-    const { data, error } = await supabase.from('transactions').insert(rows).select();
-
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-
-    res.json({ success: true, imported: data.length });
+    const inserted = await supabaseInsert('transactions', rows);
+    res.json({ success: true, imported: inserted.length });
   } catch (error) {
     console.error('Connect and sync error:', error.response?.data || error.message);
     res.status(500).json({ error: error.response?.data?.error_message || error.message });
@@ -115,14 +125,18 @@ app.post('/api/connect_and_sync', async (req, res) => {
 });
 
 app.get('/api/debug', async (req, res) => {
-  const url = process.env.SUPABASE_URL || 'missing';
-  const key = process.env.SUPABASE_KEY || 'missing';
-  res.json({
-    url_value: url,
-    url_length: url.length,
-    key_first10: key.substring(0, 10),
-    key_length: key.length
-  });
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/transactions?limit=1`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+    const data = await response.json();
+    res.json({ supabase_ok: response.ok, status: response.status, rows: data.length });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
 });
 
 app.get('/', (req, res) => {
@@ -133,3 +147,16 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Stackd backend running on port ${PORT}`);
 });
+```
+
+**Make sure nothing is below the last `});`!** Save, then push:
+```
+cd C:\Users\alvar\stackd-backend
+git add .
+git commit -m "Use direct Supabase REST API"
+git push
+```
+
+Wait for ACTIVE, then first test the debug endpoint in your browser:
+```
+https://stackd-backend-production.up.railway.app/api/debug
