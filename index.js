@@ -106,11 +106,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Stackd backend running on port ${PORT}`);
 });
-```
-
-The backend file ends at `});` — **don't copy anything after!** Save, then push:
-```
-cd C:\Users\alvar\stackd-backend
-git add .
-git commit -m "Return transactions for phone to insert"
-git push
