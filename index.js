@@ -113,18 +113,18 @@ app.post('/api/connect_and_sync', async (req, res) => {
     res.status(500).json({ error: error.response?.data?.error_message || error.message });
   }
 });
+
 app.get('/api/debug', async (req, res) => {
-  try {
-    const { data, error } = await supabase.from('transactions').select('*').limit(1);
-    if (error) {
-      res.json({ supabase_error: error.message, url: process.env.SUPABASE_URL ? 'set' : 'missing', key: process.env.SUPABASE_KEY ? 'set' : 'missing' });
-    } else {
-      res.json({ supabase_ok: true, rows: data.length, url: process.env.SUPABASE_URL ? 'set' : 'missing', key: process.env.SUPABASE_KEY ? 'set' : 'missing' });
-    }
-  } catch (e) {
-    res.json({ error: e.message, url: process.env.SUPABASE_URL ? 'set' : 'missing', key: process.env.SUPABASE_KEY ? 'set' : 'missing' });
-  }
+  const url = process.env.SUPABASE_URL || 'missing';
+  const key = process.env.SUPABASE_KEY || 'missing';
+  res.json({
+    url_value: url,
+    url_length: url.length,
+    key_first10: key.substring(0, 10),
+    key_length: key.length
+  });
 });
+
 app.get('/', (req, res) => {
   res.json({ status: 'Stackd backend is running' });
 });
