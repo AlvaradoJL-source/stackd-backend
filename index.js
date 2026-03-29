@@ -1,61 +1,11 @@
 const express = require('express');
 const cors = require('cors');
-const https = require('https');
 const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
-
-const httpsRequest = (url, options, body) => {
-  return new Promise((resolve, reject) => {
-    const req = https.request(url, options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => { data += chunk; });
-      res.on('end', () => {
-        try {
-          resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, data: JSON.parse(data) });
-        } catch (e) {
-          resolve({ ok: false, status: res.statusCode, data: data });
-        }
-      });
-    });
-    req.on('error', reject);
-    if (body) req.write(body);
-    req.end();
-  });
-};
-
-const supabaseInsert = async (table, rows) => {
-  const result = await httpsRequest(`${SUPABASE_URL}/rest/v1/${table}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
-      'Prefer': 'return=representation',
-    },
-  }, JSON.stringify(rows));
-  if (!result.ok) {
-    throw new Error(JSON.stringify(result.data));
-  }
-  return result.data;
-};
-
-const supabaseSelect = async (table, limit) => {
-  const result = await httpsRequest(`${SUPABASE_URL}/rest/v1/${table}?limit=${limit}`, {
-    method: 'GET',
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
-    },
-  });
-  return result;
-};
 
 const configuration = new Configuration({
   basePath: PlaidEnvironments[process.env.PLAID_ENV || 'sandbox'],
@@ -93,7 +43,7 @@ const mapCategory = (primary) => {
   return map[primary] || '❓ Other';
 };
 
-app.post('/api/connect_and_sync', async (req, res) => {
+app.post('/api/connect_and_get', async (req, res) => {
   try {
     const tokenResponse = await plaidClient.sandboxPublicTokenCreate({
       institution_id: 'ins_109508',
@@ -133,10 +83,6 @@ app.post('/api/connect_and_sync', async (req, res) => {
       }
     }
 
-    if (allTransactions.length === 0) {
-      return res.json({ success: true, imported: 0, message: 'Connected but transactions not ready yet. Try again.' });
-    }
-
     const rows = allTransactions.map(t => ({
       description: t.merchant_name || t.name || 'Unknown',
       amount: Math.abs(t.amount),
@@ -145,20 +91,10 @@ app.post('/api/connect_and_sync', async (req, res) => {
       date: t.date,
     }));
 
-    const inserted = await supabaseInsert('transactions', rows);
-    res.json({ success: true, imported: inserted.length });
+    res.json({ success: true, transactions: rows });
   } catch (error) {
-    console.error('Connect and sync error:', error.response?.data || error.message);
+    console.error('Error:', error.response?.data || error.message);
     res.status(500).json({ error: error.response?.data?.error_message || error.message });
-  }
-});
-
-app.get('/api/debug', async (req, res) => {
-  try {
-    const result = await supabaseSelect('transactions', 1);
-    res.json({ supabase_ok: result.ok, status: result.status, rows: Array.isArray(result.data) ? result.data.length : 0 });
-  } catch (e) {
-    res.json({ error: e.message });
   }
 });
 
@@ -170,3 +106,11 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Stackd backend running on port ${PORT}`);
 });
+```
+
+The backend file ends at `});` — **don't copy anything after!** Save, then push:
+```
+cd C:\Users\alvar\stackd-backend
+git add .
+git commit -m "Return transactions for phone to insert"
+git push
