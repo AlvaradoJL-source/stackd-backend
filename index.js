@@ -25,6 +25,8 @@ const configuration = new Configuration({
 
 const plaidClient = new PlaidApi(configuration);
 
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 const mapCategory = (primary) => {
   const map = {
     'FOOD_AND_DRINK': '🍔 Food & Dining',
@@ -58,29 +60,37 @@ app.post('/api/connect_and_sync', async (req, res) => {
     });
     const accessToken = exchangeResponse.data.access_token;
 
+    await wait(5000);
+
     const now = new Date();
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     const startDate = ninetyDaysAgo.toISOString().split('T')[0];
     const endDate = now.toISOString().split('T')[0];
 
     let allTransactions = [];
-    let hasMore = true;
-    let offset = 0;
+    let attempts = 0;
 
-    while (hasMore) {
-      const response = await plaidClient.transactionsGet({
-        access_token: accessToken,
-        start_date: startDate,
-        end_date: endDate,
-        options: { count: 100, offset: offset },
-      });
-      allTransactions = allTransactions.concat(response.data.transactions);
-      hasMore = allTransactions.length < response.data.total_transactions;
-      offset = allTransactions.length;
+    while (allTransactions.length === 0 && attempts < 3) {
+      try {
+        const response = await plaidClient.transactionsGet({
+          access_token: accessToken,
+          start_date: startDate,
+          end_date: endDate,
+          options: { count: 100, offset: 0 },
+        });
+        allTransactions = response.data.transactions;
+        if (allTransactions.length === 0) {
+          attempts++;
+          await wait(3000);
+        }
+      } catch (e) {
+        attempts++;
+        await wait(3000);
+      }
     }
 
     if (allTransactions.length === 0) {
-      return res.json({ success: true, imported: 0, message: 'Connected but no transactions yet' });
+      return res.json({ success: true, imported: 0, message: 'Connected but transactions not ready yet. Try again in 30 seconds.' });
     }
 
     const rows = allTransactions.map(t => ({
@@ -112,3 +122,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Stackd backend running on port ${PORT}`);
 });
+```
+
+**Make sure nothing extra below the last `});`!** Save, then push:
