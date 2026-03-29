@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/AlvaradoJL-source/stackd-backend#readme",
   "dependencies": {
+    "@supabase/supabase-js": "^2.100.1",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
